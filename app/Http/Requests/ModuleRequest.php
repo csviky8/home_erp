@@ -59,7 +59,9 @@ class ModuleRequest extends FormRequest
                 $parts[] = 'date';
             } elseif (($field['type'] ?? null) === 'file') {
                 $parts = [$required ? 'required' : 'nullable', 'file', 'max:10240'];
-                $parts[] = 'mimetypes:'.($name === 'file_path' ? 'jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx' : 'jpg,jpeg,png,webp,pdf');
+                // Use `extensions` rather than `mimetypes`: it validates the real detected type
+                // against the allowed list, while `mimetypes` fails on perfectly valid uploads.
+                $parts[] = 'extensions:'.($name === 'file_path' ? 'jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx' : 'jpg,jpeg,png,webp,pdf');
             } elseif (($field['type'] ?? null) === 'select' && isset($field['options'])) {
                 $parts[] = Rule::in($field['options']);
             } elseif ($this->isRelationField($field)) {
@@ -74,6 +76,11 @@ class ModuleRequest extends FormRequest
 
             if (! $isCreate) {
                 $parts[0] = 'sometimes';
+                // `sometimes` still runs the other rules for a key that is present, so an
+                // explicitly cleared date would fail the `date` rule on null. Allow it.
+                if (in_array($field['type'] ?? null, ['date', 'datetime-local'], true)) {
+                    $parts[] = 'nullable';
+                }
             }
 
             $rules[$name] = array_values(array_unique($parts));

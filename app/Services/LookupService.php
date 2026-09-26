@@ -27,7 +27,7 @@ class LookupService
     public function get(User $user, string $resource, ?string $type = null): array
     {
         $query = match ($resource) {
-            'households' => Household::query()->when(! $user->hasRole('super-admin'), fn ($q) => $q->whereKey($user->household_id)),
+            'households' => Household::query()->when($user->isSuperAdmin(), fn ($q) => $q->orderBy('id'), fn ($q) => $q->whereKey($user->workingHouseholdId())),
             'categories' => Category::query()->forUser($user)->when($type, fn ($q) => $q->where('type', $type)),
             'properties' => Property::query()->forUser($user),
             'providers' => ServiceProvider::query()->forUser($user),
@@ -35,7 +35,7 @@ class LookupService
             'vehicles' => Vehicle::query()->forUser($user),
             'pets' => Pet::query()->forUser($user),
             'plants' => Plant::query()->forUser($user),
-            'users' => User::query()->when(! $user->hasRole('super-admin'), fn ($q) => $q->where('household_id', $user->household_id)),
+            'users' => User::query()->when($user->isSuperAdmin(), fn ($q) => $q->orderBy('id'), fn ($q) => $q->where('household_id', $user->workingHouseholdId())),
             default => abort(404, 'Lookup resource not found.'),
         };
         $label = match ($resource) {

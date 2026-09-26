@@ -103,6 +103,22 @@ class AuthController extends Controller
         return response()->json(['message' => 'Password changed successfully.']);
     }
 
+    /**
+     * The family a super admin is currently working in: their saved preference, otherwise the
+     * first family. Everyone else is always on their own household.
+     */
+    public function updateHouseholdPreference(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasRole('super-admin'), 403, 'Only a super admin can choose a working family.');
+        $data = $request->validate(['default_household_id' => ['nullable', 'integer', 'exists:households,id']]);
+
+        $user->default_household_id = $data['default_household_id'] ?? null;
+        $user->save();
+
+        return response()->json(['message' => 'Working family saved.', 'user' => $this->userPayload($user->fresh())]);
+    }
+
     public function sessions(Request $request): JsonResponse
     {
         $currentId = $request->user()->currentAccessToken()?->id;
@@ -119,11 +135,25 @@ class AuthController extends Controller
         return response()->json(['message' => 'Session revoked.']);
     }
 
+    /** Saved preference wins; otherwise always fall back to the first family. */
+    private function activeHouseholdId(User $user): int
+    {
+        if (! $user->hasRole('super-admin')) {
+            return (int) $user->household_id;
+        }
+        if ($user->default_household_id && Household::whereKey($user->default_household_id)->exists()) {
+            return (int) $user->default_household_id;
+        }
+
+        return (int) ($user->household_id ?: Household::query()->orderBy('id')->value('id'));
+    }
+
     private function userPayload(User $user): array
     {
         return [
             'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'avatar_path' => $user->avatar_path,
             'household' => $user->household, 'roles' => $user->getRoleNames(), 'permissions' => $user->getAllPermissions()->pluck('name')->values(),
+            'active_household_id' => $this->activeHouseholdId($user),
             'abilities' => AccessMap::resolvedFor($user), 'areas' => AccessMap::AREAS,
         ];
     }

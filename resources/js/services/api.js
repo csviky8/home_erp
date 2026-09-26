@@ -22,5 +22,22 @@ api.interceptors.response.use(
     },
 );
 
-export const apiError = (error) => error.response?.data?.errors || error.response?.data?.message || 'Something went wrong. Please try again.';
+/** Per-field validation messages as { fieldName: 'message' }, empty when it is not a 422. */
+export const apiErrors = (error) => {
+    const errors = error.response?.data?.errors;
+    if (!errors || typeof errors !== 'object' || Array.isArray(errors)) return {};
+    return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field, Array.isArray(messages) ? messages[0] : String(messages)]));
+};
+
+/** A single human readable line describing what went wrong. */
+export const apiMessage = (error) => {
+    const data = error.response?.data;
+    if (data?.errors && typeof data.errors === 'object' && !Array.isArray(data.errors)) {
+        const messages = Object.values(data.errors).flat();
+        if (messages.length) return messages.join(' · ');
+    }
+    return data?.message || 'Something went wrong. Please try again.';
+};
+
+export const apiError = (error) => apiMessage(error);
 export default api;

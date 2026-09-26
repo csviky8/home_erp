@@ -81,10 +81,246 @@ class HomeErpApiTest extends TestCase
         // The seeded super admin account.
         $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
 
-        $this->getJson('/api/households', $headers)->assertOk()->assertJsonCount(2, 'data');
+        // Super admin sees and manages every family: the three seeded ones plus the new one.
+        $this->getJson('/api/households', $headers)->assertOk()
+            ->assertJsonCount(4, 'data')
+            ->assertJsonFragment(['id' => $other->id, 'name' => 'Neighbour Family']);
         $this->postJson('/api/households', ['name' => 'Second Family', 'timezone' => 'Asia/Kolkata', 'currency' => 'INR'], $headers)->assertCreated();
         $this->getJson('/api/households/'.$other->id.'/users', $headers)->assertOk();
         $this->putJson('/api/households/'.$other->id, ['name' => 'Renamed Neighbour'], $headers)->assertOk();
+    }
+
+    /**
+     * @dataProvider moduleCrudProvider
+     */
+    public function test_every_module_supports_create_read_update_and_delete(string $module, array $payload, string $editField): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        $household = \App\Models\Household::first();
+
+        $created = $this->postJson('/api/modules/'.$module, $payload + ['household_id' => $household->id], $headers);
+        $created->assertCreated();
+        $id = $created->json('data.id');
+        $this->assertNotNull($id, "{$module} did not return a created id.");
+
+        $this->getJson('/api/modules/'.$module, $headers)->assertOk();
+        $this->getJson('/api/modules/'.$module.'/'.$id, $headers)->assertOk();
+
+        $this->putJson('/api/modules/'.$module.'/'.$id, $payload + [$editField => 'Edited by test'], $headers)->assertOk();
+        $this->deleteJson('/api/modules/'.$module.'/'.$id, [], $headers)->assertOk();
+        $this->getJson('/api/modules/'.$module.'/'.$id, $headers)->assertNotFound();
+    }
+
+    public static function moduleCrudProvider(): array
+    {
+        return [
+            'expenses' => ['expenses', ['description' => 'Test expense', 'amount' => 100, 'expense_date' => '2026-09-25', 'payment_method' => 'cash', 'category_id' => 1], 'notes'],
+            'bills' => ['bills', ['name' => 'Test bill', 'amount' => 100, 'due_date' => '2026-10-05'], 'notes'],
+            'maintenance' => ['maintenance', ['title' => 'Test maintenance', 'category' => 'ac', 'priority' => 'low'], 'description'],
+            'assets' => ['assets', ['name' => 'Test asset', 'category' => 'ac', 'brand' => 'B', 'model' => 'M'], 'location'],
+            'tasks' => ['tasks', ['title' => 'Test task', 'priority' => 'medium'], 'description'],
+            'inventory' => ['inventory', ['name' => 'Test item', 'quantity' => 5, 'unit' => 'kg', 'category' => 'groceries'], 'vendor'],
+            'family' => ['family', ['name' => 'Test relative', 'relationship' => 'Cousin'], 'notes'],
+            'budgets' => ['budgets', ['name' => 'Test budget', 'period_start' => '2026-09-01', 'period_end' => '2026-09-30', 'amount' => 500], 'name'],
+            'subscriptions' => ['subscriptions', ['name' => 'Test sub', 'amount' => 99, 'start_date' => '2026-01-01', 'renewal_date' => '2026-10-01'], 'notes'],
+            'insurance' => ['insurance', ['policy_type' => 'home', 'premium' => 1000, 'start_date' => '2026-01-01', 'expiry_date' => '2027-01-01', 'renewal_date' => '2026-12-01'], 'policy_number'],
+            'vehicles' => ['vehicles', ['vehicle_number' => 'TEST-01', 'vehicle_type' => 'car'], 'model'],
+            'providers' => ['providers', ['name' => 'Test provider', 'service_type' => 'Plumber'], 'address'],
+            'properties' => ['properties', ['name' => 'Test property', 'property_type' => 'apartment'], 'address'],
+            'security' => ['security', ['name' => 'Test device', 'device_type' => 'cctv'], 'location'],
+            'garden' => ['garden', ['name' => 'Test plant', 'plant_type' => 'Indoor'], 'location'],
+            'pets' => ['pets', ['name' => 'Test pet', 'pet_type' => 'dog'], 'breed'],
+            'calendar' => ['calendar', ['title' => 'Test event', 'starts_at' => '2026-10-01 10:00'], 'description'],
+        ];
+    }
+
+    public function test_file_uploads_are_accepted(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        // A real 1x1 PNG, so the detected mime type is genuine rather than client supplied.
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('receipt.png', $png);
+
+        $this->post('/api/modules/documents', [
+            'title' => 'Uploaded document', 'category' => 'other', 'file_path' => $file, 'household_id' => \App\Models\Household::first()->id,
+        ], $headers)->assertCreated();
+
+        $this->post('/api/modules/assets', [
+            'name' => 'Asset with photo', 'category' => 'ac',
+            'photo_path' => \Illuminate\Http\UploadedFile::fake()->createWithContent('photo.png', $png),
+            'household_id' => \App\Models\Household::first()->id,
+        ], $headers)->assertCreated();
+    }
+
+    public function test_super_admin_create_does_not_require_a_household_id(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        $own = \App\Models\Household::first();
+
+        // No household_id supplied: it must fall back rather than fail the request.
+        $this->postJson('/api/modules/tasks', ['title' => 'Implicit household'], $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.household_id', $own->id);
+
+        // Explicitly targeting another family is still honoured.
+        $other = \App\Models\Household::create(['name' => 'Neighbour', 'slug' => 'hh-fallback-neighbour', 'timezone' => 'UTC', 'currency' => 'INR']);
+        $this->postJson('/api/modules/tasks', ['title' => 'Explicit household', 'household_id' => $other->id], $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.household_id', $other->id);
+    }
+
+    public function test_super_admin_working_family_is_saved_and_reused(): void
+    {
+        $first = \App\Models\Household::first();
+        $second = \App\Models\Household::create(['name' => 'Sharma Villa', 'slug' => 'working-family-villa', 'timezone' => 'Asia/Kolkata', 'currency' => 'INR']);
+        $login = fn () => $this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password']);
+
+        // With no preference stored, the first family is used.
+        $login()->assertJsonPath('user.active_household_id', $first->id);
+
+        // Saving the preference sticks across a brand new session.
+        $root = \App\Models\User::where('email', 'root@homeerp.test')->first();
+        $root->default_household_id = $second->id;
+        $root->save();
+        $login()->assertJsonPath('user.active_household_id', $second->id);
+
+        // A record created without household_id lands in the chosen family.
+        $headers = ['Authorization' => 'Bearer '.$login()->json('token')];
+        $this->postJson('/api/modules/tasks', ['title' => 'Working family task'], $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.household_id', $second->id);
+    }
+
+    public function test_only_a_super_admin_can_choose_a_working_family(): void
+    {
+        $household = \App\Models\Household::create(['name' => 'Sharma Villa', 'slug' => 'working-family-guard', 'timezone' => 'Asia/Kolkata', 'currency' => 'INR']);
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'admin@homeerp.test', 'password' => 'password'])->json('token')];
+
+        $this->putJson('/api/auth/working-family', ['default_household_id' => $household->id], $headers)->assertForbidden();
+        $this->assertNull(\App\Models\User::where('email', 'admin@homeerp.test')->first()->default_household_id);
+    }
+
+    public function test_super_admin_sees_only_the_selected_family_records(): void
+    {
+        $other = \App\Models\Household::create(['name' => 'Testing Data', 'slug' => 'scoped-testing-data', 'timezone' => 'Asia/Kolkata', 'currency' => 'INR']);
+        $root = \App\Models\User::where('email', 'root@homeerp.test')->first();
+        $root->default_household_id = $other->id;
+        $root->save();
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $login = $this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password']);
+        $login->assertJsonPath('user.active_household_id', $other->id);
+        $headers = ['Authorization' => 'Bearer '.$login->json('token')];
+
+        // The selected family is empty, so the other family's seeded records must not appear.
+        foreach (['tasks', 'expenses', 'assets', 'bills', 'inventory', 'calendar'] as $module) {
+            $this->getJson('/api/modules/'.$module, $headers)->assertOk()->assertJsonPath('meta.total', 0);
+        }
+
+        // New records are written to the selected family only.
+        $this->postJson('/api/modules/tasks', ['title' => 'Testing data task'], $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.household_id', $other->id);
+        $this->assertDatabaseHas('tasks', ['title' => 'Testing data task', 'household_id' => $other->id]);
+
+        // A record belonging to another family is not reachable.
+        $foreign = \App\Models\Task::where('household_id', '!=', $other->id)->first();
+        $this->getJson('/api/modules/tasks/'.$foreign->id, $headers)->assertNotFound();
+        $this->putJson('/api/modules/tasks/'.$foreign->id, ['title' => 'hijacked'], $headers)->assertNotFound();
+    }
+
+    public function test_the_seeder_builds_three_isolated_family_workspaces(): void
+    {
+        $this->assertSame(3, \App\Models\Household::count(), 'Expected three seeded family workspaces.');
+        $modules = [
+            'expenses' => \App\Models\Expense::class,
+            'bills' => \App\Models\Bill::class,
+            'tasks' => \App\Models\Task::class,
+            'assets' => \App\Models\Asset::class,
+            'vehicles' => \App\Models\Vehicle::class,
+            'inventory' => \App\Models\InventoryItem::class,
+            'pets' => \App\Models\Pet::class,
+        ];
+
+        foreach (\App\Models\Household::orderBy('id')->get() as $household) {
+            $this->assertGreaterThan(0, \App\Models\User::where('household_id', $household->id)->count(), $household->name.' needs its own users.');
+            foreach ($modules as $label => $model) {
+                $this->assertGreaterThan(0, $model::where('household_id', $household->id)->count(), $household->name.' has no '.$label.' records.');
+            }
+        }
+
+        // Each family's own users resolve to their own records only.
+        foreach (['admin@homeerp.test', 'villa.admin@homeerp.test', 'cottage.admin@homeerp.test'] as $email) {
+            $user = \App\Models\User::where('email', $email)->first();
+            $visible = \App\Models\Expense::query()->forUser($user)->distinct()->pluck('household_id');
+            $this->assertSame([$user->household_id], $visible->values()->all(), $email.' must only see its own family.');
+        }
+    }
+
+    public function test_multipart_update_is_accepted_via_method_spoofing(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+
+        // PHP only parses multipart/form-data for POST, so the browser client posts with
+        // _method=PUT when a record is edited. The fields must actually be applied.
+        $created = $this->postJson('/api/modules/assets', ['name' => 'Spoof check', 'category' => 'ac', 'brand' => 'Original'], $headers);
+        $created->assertCreated();
+        $id = $created->json('data.id');
+
+        $png = \Illuminate\Http\UploadedFile::fake()->createWithContent('p.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+        $this->post('/api/modules/assets/'.$id, [
+            '_method' => 'PUT', 'name' => 'Spoof check', 'brand' => 'Updated Brand', 'location' => 'Hallway', 'photo_path' => $png,
+        ], $headers)->assertOk()->assertJsonPath('data.brand', 'Updated Brand')->assertJsonPath('data.location', 'Hallway');
+
+        // A plain JSON update works too, which is what the client sends when there is no upload.
+        $this->putJson('/api/modules/assets/'.$id, ['brand' => 'JSON Brand'], $headers)
+            ->assertOk()->assertJsonPath('data.brand', 'JSON Brand');
+        $this->assertDatabaseHas('assets', ['id' => $id, 'brand' => 'JSON Brand']);
+    }
+
+    public function test_clearing_an_optional_date_on_edit_is_allowed(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        $created = $this->postJson('/api/modules/expenses', [
+            'description' => 'Optional date check', 'amount' => 100, 'expense_date' => now()->toDateString(),
+            'category_id' => 1, 'recurrence' => 'monthly', 'recurrence_until' => '2026-12-31',
+        ], $headers)->assertCreated();
+        $id = $created->json('data.id');
+
+        // Clearing the date sends an explicit null on update; `date` must not reject it.
+        $this->putJson('/api/modules/expenses/'.$id, [
+            'description' => 'Optional date check', 'amount' => 100, 'expense_date' => now()->toDateString(),
+            'category_id' => 1, 'recurrence' => 'monthly', 'recurrence_until' => null,
+        ], $headers)->assertOk();
+        $this->assertNull(\App\Models\Expense::find($id)->recurrence_until);
+
+        // A genuinely invalid date must still be rejected.
+        $this->putJson('/api/modules/expenses/'.$id, [
+            'description' => 'Optional date check', 'amount' => 100, 'expense_date' => now()->toDateString(),
+            'recurrence_until' => 'not-a-date',
+        ], $headers)->assertStatus(422)->assertJsonValidationErrors('recurrence_until');
+    }
+
+    public function test_a_record_can_be_viewed_by_id(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        $id = \App\Models\Expense::first()->id;
+
+        // The view drawer reads the record out of the { data: { ... } } envelope.
+        $this->getJson('/api/modules/expenses/'.$id, $headers)->assertOk()
+            ->assertJsonStructure(['data' => ['id', 'description', 'amount', 'expense_date', 'category']])
+            ->assertJsonPath('data.id', $id);
+    }
+
+    public function test_duplicate_values_return_a_readable_error(): void
+    {
+        $headers = ['Authorization' => 'Bearer '.$this->postJson('/api/auth/login', ['email' => 'root@homeerp.test', 'password' => 'password'])->json('token')];
+        $payload = ['vehicle_number' => 'DUP-01', 'vehicle_type' => 'car', 'household_id' => \App\Models\Household::first()->id];
+
+        $this->postJson('/api/modules/vehicles', $payload, $headers)->assertCreated();
+        $this->postJson('/api/modules/vehicles', $payload, $headers)
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'A record with these details already exists.');
     }
 
     public function test_users_and_roles_expose_full_action_permissions(): void

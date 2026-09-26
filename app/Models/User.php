@@ -50,4 +50,28 @@ class User extends Authenticatable
     {
         return $this->hasRole('super-admin');
     }
+
+    /**
+     * The household this user is currently working in, and therefore the only one whose data
+     * they can see or write. A super admin picks it in Settings; everyone else is pinned to the
+     * household on their account.
+     */
+    public function workingHouseholdId(): ?int
+    {
+        if ($this->isSuperAdmin()) {
+            return (int) ($this->default_household_id
+                ?: $this->household_id
+                ?: Household::query()->orderBy('id')->value('id')) ?: null;
+        }
+
+        return $this->household_id ? (int) $this->household_id : null;
+    }
+
+    public function canAccessHousehold(Household|int|null $household): bool
+    {
+        $id = $household instanceof Household ? $household->id : $household;
+        $working = $this->workingHouseholdId();
+
+        return $working !== null && $id !== null && (int) $working === (int) $id;
+    }
 }

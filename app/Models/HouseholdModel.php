@@ -14,11 +14,10 @@ abstract class HouseholdModel extends Model
 
     public function scopeForUser(Builder $query, User $user): Builder
     {
-        if ($user->hasRole('super-admin')) {
-            return $query;
-        }
+        // Everyone, super admin included, is scoped to the household they are working in.
+        $householdId = $user->workingHouseholdId();
 
-        return $query->where($query->qualifyColumn('household_id'), $user->household_id);
+        return $query->where($query->qualifyColumn('household_id'), $householdId);
     }
 
     public function household(): BelongsTo
@@ -28,7 +27,7 @@ abstract class HouseholdModel extends Model
 
     public function canAccess(User $user): bool
     {
-        return $user->hasRole('super-admin') || (int) $this->household_id === (int) $user->household_id;
+        return $user->canAccessHousehold($this->household_id);
     }
 
     public function permissionPrefix(): string

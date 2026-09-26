@@ -22,6 +22,36 @@ export const useAuthStore = defineStore('auth', () => {
         return permission ? can(permission) : false;
     };
 
+    // Super admins work across families. The server sends the saved preference (falling back to
+    // the first family), so a new session always lands on the family chosen in Settings.
+    const households = ref([]);
+    const activeHouseholdId = ref(user.value?.active_household_id || Number(localStorage.getItem('home_erp_household')) || null);
+    const activeHousehold = computed(() => {
+        if (!isSuperAdmin.value) return user.value?.household ?? null;
+        return households.value.find((item) => item.id === activeHouseholdId.value) || user.value?.household || null;
+    });
+    const setActiveHousehold = (id) => {
+        activeHouseholdId.value = id ? Number(id) : null;
+        if (activeHouseholdId.value) localStorage.setItem('home_erp_household', String(activeHouseholdId.value));
+        else localStorage.removeItem('home_erp_household');
+    };
+    // Persist to the account so the choice survives a new session and a different browser.
+    const saveActiveHousehold = async (id) => {
+        setActiveHousehold(id);
+        if (!isSuperAdmin.value) return;
+        const response = await api.put('/auth/working-family', { default_household_id: activeHouseholdId.value });
+        if (response.data?.user) user.value = { ...user.value, ...response.data.user };
+    };
+    const loadHouseholds = async () => {
+        if (!isSuperAdmin.value) return;
+        try {
+            // The endpoint wraps its list in { data: [...] }, so unwrap it or the select renders nothing.
+            const response = await api.get('/households');
+            households.value = Array.isArray(response.data?.data) ? response.data.data : [];
+            if (!activeHouseholdId.value) setActiveHousehold(user.value?.active_household_id || households.value[0]?.id);
+        } catch { households.value = []; }
+    };
+
     const applySession = (payload) => {
         token.value = payload.token;
         user.value = payload.user;
@@ -40,5 +70,5 @@ export const useAuthStore = defineStore('auth', () => {
     const logout = async () => { try { await api.post('/auth/logout'); } finally { token.value = null; user.value = null; localStorage.removeItem('home_erp_token'); } };
     const updateUser = (payload) => { user.value = { ...user.value, ...payload }; };
 
-    return { user, token, loading, error, isAuthenticated, isAdmin, isSuperAdmin, can, canAny, canArea, bootstrap, login, logout, updateUser };
+    return { user, token, loading, error, isAuthenticated, isAdmin, isSuperAdmin, can, canAny, canArea, households, activeHouseholdId, activeHousehold, setActiveHousehold, saveActiveHousehold, loadHouseholds, bootstrap, login, logout, updateUser };
 });

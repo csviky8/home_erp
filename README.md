@@ -111,6 +111,21 @@ change or remove them before exposing the app to a real network.
 | Family member | `family@homeerp.test` |
 | Staff / service user | `staff@homeerp.test` |
 
+### Family workspaces
+
+The seeder builds **three isolated families**, each with its own users, property, categories,
+providers and records. A family only ever sees its own data.
+
+| Family | Admin | Family member | Staff |
+|---|---|---|---|
+| Aurora Family Home (Bengaluru) | `admin@homeerp.test` | `family@homeerp.test` | `staff@homeerp.test` |
+| Sharma Villa (Bengaluru) | `villa.admin@homeerp.test` | `villa.family@homeerp.test` | `villa.staff@homeerp.test` |
+| Nair Cottage (Kochi) | `cottage.admin@homeerp.test` | `cottage.family@homeerp.test` | — |
+
+`root@homeerp.test` is the only super admin and can switch between all three from
+**Settings → Working family** (or the family cards). Everything they see and create is scoped to
+the family they are working in.
+
 ## Implemented modules
 
 The API uses a shared, validated module contract so every module has consistent search, filters, pagination, create/edit/view/delete, audit logging, and household scoping without duplicating CRUD code.
