@@ -78,6 +78,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('/settings/users/{user}', [SettingsController::class, 'updateUser']);
     Route::delete('/settings/users/{user}', [SettingsController::class, 'destroyUser']);
     Route::put('/settings/users/{user}/role', [SettingsController::class, 'updateUserRole']);
+    Route::get('/settings/users/{user}/permissions', [SettingsController::class, 'userPermissions']);
+    Route::put('/settings/users/{user}/permissions', [SettingsController::class, 'updateUserPermissions']);
     Route::post('/settings/categories', [SettingsController::class, 'saveCategory']);
 
     Route::middleware('throttle:ai')->group(function (): void {

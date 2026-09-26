@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\AccessMap;
 use App\Services\HomeAiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class AiChatController extends Controller
 
     public function chat(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasRole('super-admin') || $request->user()->can('ai.use'), 403);
+        abort_unless(AccessMap::allows($request->user(), 'ai', 'use'), 403);
         $data = $request->validate(['message' => ['required', 'string', 'max:1000']]);
         $key = 'ai-history-'.$request->user()->id;
         $history = Cache::get($key, []);
@@ -28,13 +29,13 @@ class AiChatController extends Controller
 
     public function history(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasRole('super-admin') || $request->user()->can('ai.use'), 403);
+        abort_unless(AccessMap::allows($request->user(), 'ai', 'use'), 403);
         return response()->json(['data' => Cache::get('ai-history-'.$request->user()->id, [])]);
     }
 
     public function clear(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasRole('super-admin') || $request->user()->can('ai.use'), 403);
+        abort_unless(AccessMap::allows($request->user(), 'ai', 'use'), 403);
         Cache::forget('ai-history-'.$request->user()->id);
         return response()->json(['message' => 'AI conversation cleared.']);
     }

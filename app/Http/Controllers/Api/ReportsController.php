@@ -39,7 +39,7 @@ class ReportsController extends Controller
         abort_unless($this->registry->can($request->user(), $module, 'export'), 403, 'You do not have permission to export this report.');
         abort_unless(in_array($format, ['excel', 'pdf'], true), 404);
         [$query, $config] = $this->query($request, $type);
-        $rows = $query->latest($config['date_field'])->limit(5000)->get()->map(fn ($row) => collect($config['columns'])->mapWithKeys(fn ($column) => [$column => data_get($row, $column)])->all());
+        $rows = $this->exportRows($query->latest($config['date_field'])->limit(5000)->get(), $config['columns'], $request->user()->household?->timezone ?: config('app.timezone'));
         $filename = 'home-erp-'.$type.'-'.now()->format('Y-m-d');
         $headings = array_map(fn ($column) => ucwords(str_replace('_', ' ', $column)), $config['columns']);
 
@@ -53,6 +53,49 @@ class ReportsController extends Controller
         }
 
         return Pdf::loadView('reports.pdf', ['title' => strtoupper($type).' REPORT', 'headings' => $headings, 'rows' => $rows])->download($filename.'.pdf');
+    }
+
+    private function exportRows(Collection $records, array $columns, string $timezone): Collection
+    {
+        return $records->map(function ($record) use ($columns, $timezone) {
+            $row = [];
+            foreach ($columns as $column) {
+                $row[$column] = $this->cellValue(data_get($record, $column), $column, $timezone);
+            }
+            return $row;
+        })->values();
+    }
+
+    private function cellValue(mixed $value, string $column, string $timezone): mixed
+    {
+        if ($value instanceof \DateTimeInterface) {
+            $dateOnly = str_contains($column, 'date') || str_ends_with($column, '_expiry') || str_ends_with($column, '_renewal') || str_starts_with($column, 'period_');
+            return $dateOnly ? $value->format('d M Y') : $value->timezone($timezone)->format('d M Y, H:i');
+        }
+        if ($value instanceof \Illuminate\Database\Eloquent\Model || $value instanceof \Illuminate\Contracts\Support\Arrayable) {
+            $value = $value->toArray();
+        } elseif (is_object($value)) {
+            $value = get_object_vars($value);
+        }
+        if (is_array($value)) {
+            $value = $value['name'] ?? $value['title'] ?? $value['vehicle_number'] ?? $value['label'] ?? json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+        if ($value === null || $value === '') {
+            return '';
+        }
+        if (is_string($value) && (str_contains($column, 'date') || str_ends_with($column, '_at') || str_ends_with($column, '_expiry') || str_ends_with($column, '_renewal'))) {
+            try {
+                $date = new \DateTimeImmutable($value, new \DateTimeZone('UTC'));
+                $dateOnly = str_contains($column, 'date') || str_ends_with($column, '_expiry') || str_ends_with($column, '_renewal');
+                return $dateOnly ? $date->format('d M Y') : $date->setTimezone(new \DateTimeZone($timezone))->format('d M Y, H:i');
+            } catch (\Throwable) {
+                return $value;
+            }
+        }
+        return $value;
     }
 
     private function query(Request $request, string $type): array

@@ -17,7 +17,13 @@
     <p>Generated {{ now()->format('d M Y, H:i') }}</p>
     <table>
         <thead><tr>@foreach ($headings as $heading)<th>{{ $heading }}</th>@endforeach</tr></thead>
-        <tbody>@foreach ($rows as $row)<tr>@foreach ($row as $value)<td>{{ $value }}</td>@endforeach</tr>@endforeach</tbody>
+        <tbody>
+        @forelse ($rows as $row)
+            <tr>@foreach ($row as $value)<td>{{ is_scalar($value) ? $value : json_encode($value) }}</td>@endforeach</tr>
+        @empty
+            <tr><td colspan="{{ count($headings) }}">No records found for this report.</td></tr>
+        @endforelse
+        </tbody>
     </table>
 </body>
 </html>

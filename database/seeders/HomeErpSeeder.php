@@ -37,7 +37,8 @@ class HomeErpSeeder extends Seeder
         $admin = $this->user('admin@homeerp.test', 'Aarav Sharma', $household);
         $family = $this->user('family@homeerp.test', 'Diya Sharma', $household);
         $staff = $this->user('staff@homeerp.test', 'Ravi Kumar', $household);
-        $admin->syncRoles(['admin']); $family->syncRoles(['family-member']); $staff->syncRoles(['staff']);
+        $root = $this->user('root@homeerp.test', 'System Owner', $household);
+        $root->syncRoles(['super-admin']); $admin->syncRoles(['admin']); $family->syncRoles(['family-member']); $staff->syncRoles(['staff']);
         $property = Property::create(['household_id' => $household->id, 'name' => 'Aurora Home', 'address' => '24 Green Park, Bengaluru', 'property_type' => 'villa', 'ownership_status' => 'owned', 'purchase_date' => '2021-06-12', 'purchase_value' => 18500000, 'current_value' => 24500000]);
         $categories = $this->categories($household);
         $providers = $this->providers($household);
@@ -47,7 +48,11 @@ class HomeErpSeeder extends Seeder
 
     private function seedPermissions(): void
     {
-        $permissions = ['dashboard.view', 'records.create', 'settings.view', 'settings.manage', 'users.view', 'reports.view', 'reports.export', 'ai.use'];
+        $permissions = ['dashboard.view', 'records.create', 'settings.view', 'settings.manage', 'reports.view', 'reports.export', 'ai.use'];
+        // Users and the role manager get the same full action set as every other module.
+        foreach (['users', 'roles'] as $area) {
+            $permissions[] = $area.'.view'; $permissions[] = $area.'.create'; $permissions[] = $area.'.edit'; $permissions[] = $area.'.delete';
+        }
         foreach (config('home_modules', []) as $module) foreach (['view', 'create', 'edit', 'delete', 'export', 'approve'] as $ability) $permissions[] = $module['prefix'].'.'.$ability;
         foreach (array_unique($permissions) as $permission) Permission::findOrCreate($permission, 'web');
         $super = Role::findOrCreate('super-admin', 'web'); $admin = Role::findOrCreate('admin', 'web'); $member = Role::findOrCreate('family-member', 'web'); $staff = Role::findOrCreate('staff', 'web');

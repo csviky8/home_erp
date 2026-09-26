@@ -10,6 +10,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\ResetPasswordRequest;
 use App\Models\Household;
 use App\Models\User;
+use App\Support\AccessMap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -123,6 +124,7 @@ class AuthController extends Controller
         return [
             'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'avatar_path' => $user->avatar_path,
             'household' => $user->household, 'roles' => $user->getRoleNames(), 'permissions' => $user->getAllPermissions()->pluck('name')->values(),
+            'abilities' => AccessMap::resolvedFor($user), 'areas' => AccessMap::AREAS,
         ];
     }
 }

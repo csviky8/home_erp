@@ -180,10 +180,11 @@ class ModuleController extends Controller
                 continue;
             }
 
-            $exists = DB::table($table)->whereKey($data[$name])->when($type && $table === 'categories', fn ($q) => $q->where('type', $type))->exists();
+            // DB::table() returns a query builder, which has no whereKey(); use an explicit id column.
+            $exists = DB::table($table)->where('id', $data[$name])->when($type && $table === 'categories', fn ($q) => $q->where('type', $type))->exists();
             abort_unless($exists, 422, "The selected {$field['label']} is invalid.");
             if (! $user->hasRole('super-admin') && Schema::hasColumn($table, 'household_id')) {
-                abort_unless(DB::table($table)->whereKey($data[$name])->where('household_id', $user->household_id)->exists(), 403, 'The selected relation is outside your household.');
+                abort_unless(DB::table($table)->where('id', $data[$name])->where('household_id', $user->household_id)->exists(), 403, 'The selected relation is outside your household.');
             }
         }
     }

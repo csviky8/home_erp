@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# home_erp
-=======
 # NOVA Home ERP 3D
 
 A full-stack Home Management ERP with a Vue 3 + Tailwind responsive control plane and a real Three.js spatial home view.
@@ -44,12 +41,72 @@ Open **http://127.0.0.1:8002** for the built SPA. Vite runs on `http://127.0.0.1
 
 Port `8000` is already occupied by another local application in this environment, so this project uses `8002`.
 
+## Roles and permissions
+
+Access is **permission-driven, not role-name driven**. `App\Support\AccessMap` is the single
+source of truth that maps each area of the app to the permission that unlocks it. Both the
+API guards and the Vue interface read it, so a panel can never be hidden in the UI while the
+API allows it (or the reverse).
+
+| Area | Ability | Permission |
+|---|---|---|
+| Dashboard | view | `dashboard.view` |
+| Settings | view | `settings.view` |
+| Settings | manage | `settings.manage` |
+| People & roles | view | `users.view` |
+| People & roles | create | `users.create` |
+| People & roles | edit | `users.edit` |
+| People & roles | delete | `users.delete` |
+| Role manager | view | `roles.view` |
+| Role manager | create | `roles.create` |
+| Role manager | edit | `roles.edit` |
+| Role manager | delete | `roles.delete` |
+| Families | view / manage | `settings.manage` |
+| Reports & exports | view / export | `reports.view` / `reports.export` |
+| AI assistant | use | `ai.use` |
+| Every module | view/create/edit/delete/export/approve | `<module>.<ability>` |
+
+Rules:
+
+- `super-admin` is a full bypass everywhere, matching the backend guards.
+- Any other role sees exactly what its permissions allow. Grant a custom role `settings.manage`
+  and it gains the same Settings, People & roles, and Families panels an Admin sees.
+- **Only a super admin** may grant the `super-admin` role, or change the permissions of a system
+  role (`admin`, `family-member`, `staff`). This prevents an admin from escalating itself or
+  stripping its own management permissions and locking everyone out.
+- Household isolation still applies to data: `settings.manage` lets an Admin work across
+  families, but every other user is scoped to their own `household_id`.
+
+The signed-in user payload carries a resolved `abilities` map plus the raw `areas` definition,
+which is what `auth.canArea('users', 'manage')` in the frontend reads.
+
+### Data isolation (whose data you can touch)
+
+Permissions decide **what** you may do; the household rule decides **whose data** you may act on:
+
+| Role | Family workspaces | Data scope |
+|---|---|---|
+| `super-admin` | sees and creates **all** families | every household |
+| `admin` | sees only its **own** family card | its own household only |
+| any other role | no family workspaces | its own household only |
+
+An admin therefore has full management rights *inside* its own family, but every route is
+locked to `household_id = user.household_id`. Reading another family's members, editing another
+family's settings, or creating users in another family all return `403`, and `GET /api/households`
+returns a single card. This is enforced in one place, `AccessMap::reachesHousehold()` /
+`AccessMap::managesAllHouseholds()`, and combined with `HouseholdModel::scopeForUser()` for module data.
+
+Note: the test suite's auth guard memoizes the resolved user between requests within a single
+test method, so tests that switch identity use separate test methods or separate accounts.
+
 ## Demo accounts
 
-All demo accounts use password `password`.
+All demo accounts use password `password`. These are **development/demo credentials only** —
+change or remove them before exposing the app to a real network.
 
 | Role | Email |
 |---|---|
+| Super admin | `root@homeerp.test` |
 | Admin | `admin@homeerp.test` |
 | Family member | `family@homeerp.test` |
 | Staff / service user | `staff@homeerp.test` |
@@ -103,4 +160,3 @@ php artisan test --no-coverage
 ```
 
 The feature suite covers authentication, dashboard data, module access, AI responses, role denial, and expense create/update/delete. The MySQL smoke test also verified every configured module schema/list endpoint, reports, Excel export, and the Vite API proxy.
->>>>>>> master
