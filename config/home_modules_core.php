@@ -1,0 +1,147 @@
+<?php
+
+use App\Models\Bill;
+use App\Models\Expense;
+
+return [
+    'expenses' => [
+        'model' => Expense::class, 'label' => 'Expenses', 'icon' => 'receipt', 'prefix' => 'expenses',
+        'searchable' => ['description', 'paid_by', 'notes'], 'default_sort' => '-expense_date',
+        'columns' => ['description', 'amount', 'category', 'expense_date', 'payment_method', 'status'],
+        'fields' => [
+            ['name' => 'description', 'label' => 'Description', 'type' => 'text', 'required' => true],
+            ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'required' => true, 'step' => '0.01'],
+            ['name' => 'expense_date', 'label' => 'Date', 'type' => 'date', 'required' => true],
+            ['name' => 'category_id', 'label' => 'Category', 'type' => 'select', 'source' => 'categories/expense'],
+            ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'],
+            ['name' => 'payment_method', 'label' => 'Payment method', 'type' => 'select', 'options' => ['cash', 'card', 'bank', 'upi', 'other']],
+            ['name' => 'paid_by', 'label' => 'Paid by', 'type' => 'text'],
+            ['name' => 'recurrence', 'label' => 'Recurring', 'type' => 'select', 'options' => ['', 'weekly', 'monthly', 'quarterly', 'yearly']],
+            ['name' => 'recurrence_until', 'label' => 'Recurring until', 'type' => 'date'],
+            ['name' => 'receipt_path', 'label' => 'Receipt', 'type' => 'file', 'accept' => 'image/*,application/pdf'],
+            ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'bills' => [
+        'model' => Bill::class, 'label' => 'Bills & payments', 'icon' => 'file-text', 'prefix' => 'bills',
+        'searchable' => ['name', 'account_number', 'notes'], 'default_sort' => 'due_date',
+        'columns' => ['name', 'amount', 'due_date', 'status', 'provider', 'payment_date'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Bill name', 'type' => 'text', 'required' => true],
+            ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'required' => true, 'step' => '0.01'],
+            ['name' => 'due_date', 'label' => 'Due date', 'type' => 'date', 'required' => true],
+            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['upcoming', 'due', 'paid', 'overdue']],
+            ['name' => 'account_number', 'label' => 'Account number', 'type' => 'text'],
+            ['name' => 'service_provider_id', 'label' => 'Provider', 'type' => 'select', 'source' => 'providers'],
+            ['name' => 'category_id', 'label' => 'Category', 'type' => 'select', 'source' => 'categories/bill'],
+            ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'],
+            ['name' => 'recurrence', 'label' => 'Recurring', 'type' => 'select', 'options' => ['', 'weekly', 'monthly', 'quarterly', 'yearly']],
+            ['name' => 'reminder_days', 'label' => 'Reminder days', 'type' => 'number'],
+            ['name' => 'payment_date', 'label' => 'Payment date', 'type' => 'date'],
+            ['name' => 'attachment_path', 'label' => 'Attachment', 'type' => 'file', 'accept' => 'image/*,application/pdf'],
+            ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'maintenance' => [
+        'model' => App\Models\MaintenanceRequest::class, 'label' => 'Maintenance', 'icon' => 'wrench', 'prefix' => 'maintenance',
+        'searchable' => ['title', 'description', 'notes'], 'default_sort' => '-created_at',
+        'columns' => ['title', 'category', 'priority', 'status', 'scheduled_date', 'actual_cost'],
+        'fields' => [
+            ['name' => 'title', 'label' => 'Request title', 'type' => 'text', 'required' => true],
+            ['name' => 'description', 'label' => 'Description', 'type' => 'textarea'],
+            ['name' => 'category', 'label' => 'Category', 'type' => 'select', 'options' => ['plumbing', 'electrical', 'ac', 'refrigerator', 'washing-machine', 'carpentry', 'painting', 'cleaning', 'appliance-repair', 'general-repair']],
+            ['name' => 'priority', 'label' => 'Priority', 'type' => 'select', 'options' => ['low', 'medium', 'high', 'urgent']],
+            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['new', 'scheduled', 'in-progress', 'completed', 'cancelled']],
+            ['name' => 'estimated_cost', 'label' => 'Estimated cost', 'type' => 'number', 'step' => '0.01'],
+            ['name' => 'actual_cost', 'label' => 'Actual cost', 'type' => 'number', 'step' => '0.01'],
+            ['name' => 'scheduled_date', 'label' => 'Scheduled date', 'type' => 'date'],
+            ['name' => 'completion_date', 'label' => 'Completion date', 'type' => 'date'],
+            ['name' => 'asset_id', 'label' => 'Asset', 'type' => 'select', 'source' => 'assets'],
+            ['name' => 'service_provider_id', 'label' => 'Provider', 'type' => 'select', 'source' => 'providers'],
+            ['name' => 'assigned_user_id', 'label' => 'Assignee', 'type' => 'select', 'source' => 'users'],
+            ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'assets' => [
+        'model' => App\Models\Asset::class, 'label' => 'Assets', 'icon' => 'package', 'prefix' => 'assets',
+        'searchable' => ['name', 'brand', 'model', 'serial_number', 'location'], 'default_sort' => '-created_at',
+        'columns' => ['name', 'category', 'brand', 'location', 'condition', 'warranty_expiry'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Asset name', 'type' => 'text', 'required' => true],
+            ['name' => 'category', 'label' => 'Category', 'type' => 'select', 'options' => ['tv', 'ac', 'refrigerator', 'washing-machine', 'microwave', 'furniture', 'laptop', 'mobile', 'electronics', 'other']],
+            ['name' => 'brand', 'label' => 'Brand', 'type' => 'text'], ['name' => 'model', 'label' => 'Model', 'type' => 'text'],
+            ['name' => 'serial_number', 'label' => 'Serial number', 'type' => 'text'], ['name' => 'purchase_date', 'label' => 'Purchase date', 'type' => 'date'],
+            ['name' => 'purchase_price', 'label' => 'Purchase price', 'type' => 'number', 'step' => '0.01'], ['name' => 'warranty_months', 'label' => 'Warranty months', 'type' => 'number'],
+            ['name' => 'warranty_expiry', 'label' => 'Warranty expiry', 'type' => 'date'], ['name' => 'vendor', 'label' => 'Vendor', 'type' => 'text'],
+            ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'], ['name' => 'location', 'label' => 'Location', 'type' => 'text'],
+            ['name' => 'condition', 'label' => 'Condition', 'type' => 'select', 'options' => ['new', 'excellent', 'good', 'fair', 'needs-repair']],
+            ['name' => 'photo_path', 'label' => 'Photo', 'type' => 'file', 'accept' => 'image/*'], ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'tasks' => [
+        'model' => App\Models\Task::class, 'label' => 'Household tasks', 'icon' => 'check-square', 'prefix' => 'tasks',
+        'searchable' => ['title', 'description'], 'default_sort' => 'due_at', 'columns' => ['title', 'assignee', 'due_at', 'priority', 'status'],
+        'fields' => [
+            ['name' => 'title', 'label' => 'Task title', 'type' => 'text', 'required' => true], ['name' => 'description', 'label' => 'Description', 'type' => 'textarea'],
+            ['name' => 'assigned_user_id', 'label' => 'Assignee', 'type' => 'select', 'source' => 'users'], ['name' => 'due_at', 'label' => 'Due date', 'type' => 'datetime-local'],
+            ['name' => 'priority', 'label' => 'Priority', 'type' => 'select', 'options' => ['low', 'medium', 'high']],
+            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['pending', 'in-progress', 'completed', 'cancelled']],
+            ['name' => 'recurrence', 'label' => 'Recurring', 'type' => 'select', 'options' => ['', 'daily', 'weekly', 'monthly', 'yearly']],
+        ],
+    ],
+    'inventory' => [
+        'model' => App\Models\InventoryItem::class, 'label' => 'Inventory', 'icon' => 'boxes', 'prefix' => 'inventory',
+        'searchable' => ['name', 'sku', 'vendor', 'location'], 'default_sort' => 'name', 'columns' => ['name', 'category', 'quantity', 'unit', 'minimum_quantity', 'expiry_date'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Item name', 'type' => 'text', 'required' => true], ['name' => 'category', 'label' => 'Category', 'type' => 'select', 'options' => ['groceries', 'kitchen', 'cleaning', 'bathroom', 'stationery', 'other']],
+            ['name' => 'quantity', 'label' => 'Quantity', 'type' => 'number', 'step' => '0.01', 'required' => true], ['name' => 'unit', 'label' => 'Unit', 'type' => 'text', 'required' => true],
+            ['name' => 'minimum_quantity', 'label' => 'Minimum quantity', 'type' => 'number', 'step' => '0.01'], ['name' => 'purchase_price', 'label' => 'Purchase price', 'type' => 'number', 'step' => '0.01'],
+            ['name' => 'vendor', 'label' => 'Vendor', 'type' => 'text'], ['name' => 'expiry_date', 'label' => 'Expiry date', 'type' => 'date'], ['name' => 'location', 'label' => 'Location', 'type' => 'text'],
+            ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'],
+        ],
+    ],
+    'family' => [
+        'model' => App\Models\FamilyMember::class, 'label' => 'Family members', 'icon' => 'users', 'prefix' => 'family',
+        'searchable' => ['name', 'relationship', 'email', 'mobile'], 'default_sort' => 'name', 'columns' => ['name', 'relationship', 'email', 'mobile', 'role_label'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Name', 'type' => 'text', 'required' => true], ['name' => 'relationship', 'label' => 'Relationship', 'type' => 'text'],
+            ['name' => 'email', 'label' => 'Email', 'type' => 'email'], ['name' => 'mobile', 'label' => 'Mobile', 'type' => 'text'], ['name' => 'date_of_birth', 'label' => 'Date of birth', 'type' => 'date'],
+            ['name' => 'role_label', 'label' => 'Role', 'type' => 'text'], ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'budgets' => [
+        'model' => App\Models\Budget::class, 'label' => 'Budgets', 'icon' => 'target', 'prefix' => 'budgets',
+        'searchable' => ['name'], 'default_sort' => '-period_start', 'columns' => ['name', 'period_type', 'period_start', 'period_end', 'amount', 'is_active'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Budget name', 'type' => 'text', 'required' => true], ['name' => 'period_type', 'label' => 'Period', 'type' => 'select', 'options' => ['monthly', 'yearly']],
+            ['name' => 'period_start', 'label' => 'Start date', 'type' => 'date', 'required' => true], ['name' => 'period_end', 'label' => 'End date', 'type' => 'date', 'required' => true],
+            ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'required' => true, 'step' => '0.01'], ['name' => 'alert_percent', 'label' => 'Alert at %', 'type' => 'number'],
+            ['name' => 'category_id', 'label' => 'Category', 'type' => 'select', 'source' => 'categories/expense'], ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'],
+            ['name' => 'is_active', 'label' => 'Active', 'type' => 'checkbox'],
+        ],
+    ],
+    'subscriptions' => [
+        'model' => App\Models\Subscription::class, 'label' => 'Subscriptions', 'icon' => 'repeat', 'prefix' => 'subscriptions',
+        'searchable' => ['name', 'notes'], 'default_sort' => 'renewal_date', 'columns' => ['name', 'amount', 'billing_cycle', 'renewal_date', 'status'],
+        'fields' => [
+            ['name' => 'name', 'label' => 'Subscription', 'type' => 'text', 'required' => true], ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'required' => true, 'step' => '0.01'],
+            ['name' => 'billing_cycle', 'label' => 'Billing cycle', 'type' => 'select', 'options' => ['weekly', 'monthly', 'quarterly', 'yearly']],
+            ['name' => 'start_date', 'label' => 'Start date', 'type' => 'date', 'required' => true], ['name' => 'renewal_date', 'label' => 'Renewal date', 'type' => 'date', 'required' => true],
+            ['name' => 'service_provider_id', 'label' => 'Provider', 'type' => 'select', 'source' => 'providers'], ['name' => 'payment_method', 'label' => 'Payment method', 'type' => 'text'],
+            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active', 'paused', 'cancelled']], ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+    'insurance' => [
+        'model' => App\Models\InsurancePolicy::class, 'label' => 'Insurance', 'icon' => 'shield-check', 'prefix' => 'insurance',
+        'searchable' => ['policy_number', 'policy_type', 'provider_name'], 'default_sort' => 'renewal_date', 'columns' => ['policy_type', 'provider_name', 'policy_number', 'premium', 'renewal_date', 'status'],
+        'fields' => [
+            ['name' => 'policy_type', 'label' => 'Policy type', 'type' => 'select', 'options' => ['home', 'vehicle', 'health', 'life', 'other'], 'required' => true],
+            ['name' => 'provider_name', 'label' => 'Provider', 'type' => 'text'], ['name' => 'policy_number', 'label' => 'Policy number', 'type' => 'text'],
+            ['name' => 'premium', 'label' => 'Premium', 'type' => 'number', 'required' => true, 'step' => '0.01'], ['name' => 'start_date', 'label' => 'Start date', 'type' => 'date', 'required' => true],
+            ['name' => 'expiry_date', 'label' => 'Expiry date', 'type' => 'date', 'required' => true], ['name' => 'renewal_date', 'label' => 'Renewal date', 'type' => 'date', 'required' => true],
+            ['name' => 'coverage_amount', 'label' => 'Coverage amount', 'type' => 'number', 'step' => '0.01'], ['name' => 'service_provider_id', 'label' => 'Service provider', 'type' => 'select', 'source' => 'providers'],
+            ['name' => 'property_id', 'label' => 'Property', 'type' => 'select', 'source' => 'properties'], ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active', 'expired', 'cancelled']], ['name' => 'notes', 'label' => 'Notes', 'type' => 'textarea'],
+        ],
+    ],
+];
+
